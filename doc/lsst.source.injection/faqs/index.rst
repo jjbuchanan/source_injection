@@ -14,7 +14,7 @@ This page contains a list of frequently asked questions (and answers) about the 
 
     Full documentation for this repository can be found on the :ref:`main page <lsst.source.injection>`.
 
-.. figure:: _assets/t9813p42i_zoom_stamp_prepost_injection.gif
+.. figure:: ../_assets/t9813p42i_zoom_stamp_prepost_injection.gif
     :name: t9813p42i_zoom_stamp_prepost_injection
     :alt: An HSC i-band cutout from tract 9813, patch 42, showcasing the injection of the Rubin Observatory logo.
     :align: center
@@ -28,7 +28,7 @@ This page contains a list of frequently asked questions (and answers) about the 
     .. list-table::
         :widths: 1 1
 
-        * - .. figure:: _assets/t9813p42i_zoom_stamp_pre_injection.png
+        * - .. figure:: ../_assets/t9813p42i_zoom_stamp_pre_injection.png
                 :name: t9813p42i_zoom_stamp_pre_injection
                 :alt: Tract 9813, patch 42, HSC i-band cutout, before postage stamp injection.
                 :align: center
@@ -37,7 +37,7 @@ This page contains a list of frequently asked questions (and answers) about the 
                 ..
 
                 Before injection.
-          - .. figure:: _assets/t9813p42i_zoom_stamp_post_injection.png
+          - .. figure:: ../_assets/t9813p42i_zoom_stamp_post_injection.png
                 :name: t9813p42i_zoom_stamp_post_injection
                 :alt: Tract 9813, patch 42, HSC i-band cutout, after postage stamp injection.
                 :align: center
@@ -343,6 +343,76 @@ If you then lose your original astropy table, that data will be lost forever.
 For this reason, it is usually recommended that your input catalog is ingested first, to facilitate future data analysis and provenance checking.
 
 Please also note that it is not currently possible to perform source injection on the command line without first ingesting an input catalog into the data butler.
+
+.. _lsst.source.injection-faqs-write-into-butler:
+
+Is it possible to write injected exposures back into a data butler?
+===================================================================
+
+When working in a command line environment and using ``pipetask run``, injected outputs are automatically written back into the data butler.
+However, when working in a Python/Jupyter notebook environment, calling injection tasks directly and running them will not ingest any outputs back into the data butler.
+
+Whilst it is *possible* to write bespoke injected outputs into the data butler, e.g., to facilitate onward processing downstream, this is not normally recommended.
+Rather, injecting sources into data within a notebook envionment is designed for quick-look analyses alone.
+Datasets ingested into the butler have strict format requirements, without which it would be impossible to guarantee the integrity of a given pipeline.
+
+If you do wish to perform source injection inside a Python/Jupyter notebook environment and store the outputs in the data butler for subsequent processing, it is strongly recommended to make use of the `SimplePipelineExecutor`.
+The `SimplePipelineExecutor` is a lightweight high-level executor for running pipelines in Python.
+The example below demonstrates how to use the `SimplePipelineExecutor` to run a source injection task in a pipeline already constructed (see :ref:`lsst.source.injection-ref-make`) and write the outputs back into the data butler:
+
+    .. code-block:: python
+
+        import os
+        from lsst.ctrl.mpexec import SimplePipelineExecutor
+        from lsst.pipe.base import Pipeline
+
+        user = os.getenv("USER")
+
+        # Create a Butler instance with collections for processing.
+        butler = SimplePipelineExecutor.prep_butler(
+            REPO,
+            inputs=["HSC/runs/RC2/w_2024_10/DM-43178", "injection/defaults"],
+            output=f"u/{user}/my_injected_outputs",
+        )
+
+        # Load the pipeline from a YAML file.
+        pipeline = Pipeline.fromFile(
+            os.path.join(
+                "PATH", "TO", "DRP-RC2+injection.yaml#inject_coadd"
+            )
+        )
+
+        # Optionally configure a task.
+        pipeline.addConfigOverride(
+            label="inject_coadd",
+            key="process_all_data_ids",
+            value=True,
+        )
+
+        # Check that the config has been applied.
+        inject_coadd_task = pipeline.to_graph().tasks.get("inject_coadd")
+        print(inject_coadd_task.config.process_all_data_ids)  # True
+
+        # Create executor; build a QuantumGraph from an in-memory pipeline.
+        executor = SimplePipelineExecutor.from_pipeline(
+            pipeline=pipeline,
+            where=(
+                "instrument='HSC' AND skymap='hsc_rings_v1' "
+                "AND tract=9813 AND patch=42 AND band='i'"
+            ),
+            butler=butler,
+        )
+
+        # Run all quanta in the QuantumGraph.
+        quanta = executor.run(register_dataset_types=True)
+        print(f"number of quanta executed: {len(quanta)}")
+
+        # Get the run outputs.
+        dataset_refs = {
+            dtype.name:ref[0] for dtype, ref in quanta[0].outputs.items()
+        }
+        print(f"available dataset types: {list(dataset_refs.keys())}")
+        injected_deepCoadd = butler.get(dataset_refs["injected_deepCoadd"])
 
 .. _lsst.source.injection-faqs-restrictions-guidelines-conventions:
 
