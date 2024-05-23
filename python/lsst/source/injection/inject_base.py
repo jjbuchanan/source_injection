@@ -120,7 +120,7 @@ class BaseInjectConfig(PipelineTaskConfig, pipelineConnections=BaseInjectConnect
     add_noise = Field[bool](
         doc="Whether to randomly vary the injected flux in each pixel by an amount consistent with "
         "the injected variance.",
-        default=False,
+        default=True,
     )
     noise_seed = Field[int](
         doc="Initial seed for random noise generation. This value increments by 1 for each injected "

@@ -394,7 +394,7 @@ def inject_galsim_objects_into_exposure(
     mask_plane_name: str = "INJECTED",
     calib_flux_radius: float = 12.0,
     draw_size_max: int = 1000,
-    add_noise: bool = False,
+    add_noise: bool = True,
     noise_seed: int = 0,
     logger: Any | None = None,
 ) -> tuple[list[int], list[galsim.BoundsI], list[bool], list[bool]]:
